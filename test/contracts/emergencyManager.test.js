@@ -32,6 +32,7 @@ describe('Emergency mode test', () => {
     const pendingStateTimeoutDefault = 10;
     const trustedAggregatorTimeoutDefault = 10;
     let firstDeployment = true;
+    const l2StakingAddress = '0x1111111111111111111111111111111111111111';
 
     beforeEach('Deploy contract', async () => {
         upgrades.silenceWarnings();
@@ -132,7 +133,7 @@ describe('Emergency mode test', () => {
         await maticTokenContract.transfer(trustedSequencer.address, ethers.utils.parseEther('1000'));
 
         // init data committee
-        await cdkDataCommitteeContract.initialize();
+        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address,l2StakingAddress);
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
         await expect(cdkDataCommitteeContract.connect(deployer)
             .setupCommittee(0, [], []))

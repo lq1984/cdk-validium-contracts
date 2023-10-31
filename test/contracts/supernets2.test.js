@@ -41,6 +41,9 @@ describe('CDKValidium', () => {
     const MAX_BATCH_MULTIPLIER = 12;
     const HALT_AGGREGATION_TIMEOUT = 60 * 60 * 24 * 7; // 7 days
     const _MAX_VERIFY_BATCHES = 1000;
+
+    const l2StakingAddress = '0x1111111111111111111111111111111111111111';
+
     beforeEach('Deploy contract', async () => {
         upgrades.silenceWarnings();
 
@@ -134,7 +137,7 @@ describe('CDKValidium', () => {
             networkName,
             version,
         );
-        await cdkDataCommitteeContract.initialize();
+        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address, l2StakingAddress);
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
         await expect(cdkDataCommitteeContract.connect(deployer)
             .setupCommittee(0, [], []))
