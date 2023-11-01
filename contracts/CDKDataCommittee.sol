@@ -62,40 +62,10 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
      */
     function setupCommittee(
         uint _requiredAmountOfSignatures,
-        string[] calldata urls,
-        bytes calldata addrsBytes
+        string[] memory urls,
+        bytes memory addrsBytes
     ) external onlyOwner {
-        uint membersLength = urls.length;
-        if (membersLength <  _requiredAmountOfSignatures) {
-            revert TooManyRequiredSignatures();
-        }
-        if (addrsBytes.length != membersLength * _ADDR_SIZE) {
-            revert UnexpectedAddrsBytesLength();
-        }
-
-        delete members;
-        address lastAddr;
-        for (uint i = 0; i < membersLength; i++) {
-            uint currentAddresStartingByte = i * _ADDR_SIZE;
-            address currentMemberAddr = address(bytes20(addrsBytes[
-                        currentAddresStartingByte :
-                        currentAddresStartingByte + _ADDR_SIZE
-            ]));
-            if (bytes(urls[i]).length == 0) {
-                revert EmptyURLNotAllowed();
-            }
-            if (lastAddr >= currentMemberAddr) {
-                revert WrongAddrOrder();
-            }
-            lastAddr = currentMemberAddr;
-            members.push(Member({
-                url: urls[i],
-                addr: currentMemberAddr
-            }));
-        }
-        committeeHash = keccak256(addrsBytes);
-        requiredAmountOfSignatures = _requiredAmountOfSignatures;
-        emit CommitteeUpdated(committeeHash);
+        _setupCommittee(_requiredAmountOfSignatures,urls,addrsBytes);
     }
 
     function getAmountOfMembers() public view returns(uint256) {
