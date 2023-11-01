@@ -10,7 +10,7 @@ function calculateGlobalExitRoot(mainnetExitRoot, rollupExitRoot) {
     return ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [mainnetExitRoot, rollupExitRoot]);
 }
 
-describe('Polygon Data Committee And Bridge', () => {
+describe('Bridge Data committee from L2', () => {
     let rollup;
     let deployer;
     let polygonZkEVMGlobalExitRoot;
@@ -68,7 +68,7 @@ describe('Polygon Data Committee And Bridge', () => {
         expect(await polygonZkEVMBridgeContract.polygonZkEVMaddress()).to.be.equal(polygonZkEVMAddress);
     });
 
-    it('success bridge members', async () => {
+    it('success bridge committee from l2', async () => {
         // Add a claim leaf to rollup exit tree
         const originNetwork = networkIDRollup;
         const originAddress = l2StakingAddress; // ether
@@ -153,7 +153,91 @@ describe('Polygon Data Committee And Bridge', () => {
             .withArgs(memberHash);
     });
 
-    it('fails bridge members; caller is not bridge', async () => {
+    it('should check origin address is l2 staking', async () => {
+        // Add a claim leaf to rollup exit tree
+        const originNetwork = networkIDRollup;
+        const originAddress = ethers.constants.AddressZero; // ether
+        const amount = ethers.utils.parseEther('0');
+        const destinationNetwork = networkIDMainnet;
+        const destinationAddress = cdkDataCommitteeContract.address;
+        const mainnetExitRoot = await polygonZkEVMGlobalExitRoot.lastMainnetExitRoot();
+        const nMembers = 4;
+        const committeeMembers = [];
+        const addrs = await ethers.getSigners();
+        const committeeAddrs = addrs.slice(0, nMembers)
+            .sort((a, b) => a.address - b.address);
+        for (let i = 0; i < nMembers; i++) {
+            committeeMembers.push({
+                url: `foo-${i}`,
+                addr: committeeAddrs[i].address,
+            });
+        }
+        const { metadata } = membersToAddrsBytes(committeeMembers);
+        const metadataHash = ethers.utils.solidityKeccak256(['bytes'], [metadata]);
+        const height = 32;
+        const merkleTree = new MerkleTreeBridge(height);
+        const leafValue = getLeafValue(
+            LEAF_TYPE_MESSAGE,
+            originNetwork,
+            originAddress,
+            destinationNetwork,
+            destinationAddress,
+            amount,
+            metadataHash,
+        );
+        merkleTree.add(leafValue);
+
+        // check merkle root with SC
+        const rootJSRollup = merkleTree.getRoot();
+
+        // add rollup Merkle root
+        await expect(polygonZkEVMGlobalExitRoot.connect(rollup).updateExitRoot(rootJSRollup))
+            .to.emit(polygonZkEVMGlobalExitRoot, 'UpdateGlobalExitRoot')
+            .withArgs(mainnetExitRoot, rootJSRollup);
+
+        // check roots
+        const rollupExitRootSC = await polygonZkEVMGlobalExitRoot.lastRollupExitRoot();
+        expect(rollupExitRootSC).to.be.equal(rootJSRollup);
+
+        const computedGlobalExitRoot = calculateGlobalExitRoot(mainnetExitRoot, rollupExitRootSC);
+        expect(computedGlobalExitRoot).to.be.equal(await polygonZkEVMGlobalExitRoot.getLastGlobalExitRoot());
+
+        // check merkle proof
+        const proof = merkleTree.getProofTreeByIndex(0);
+        const index = 0;
+
+        // verify merkle proof
+        expect(verifyMerkleProof(leafValue, proof, index, rootJSRollup)).to.be.equal(true);
+        expect(await polygonZkEVMBridgeContract.verifyMerkleProof(
+            leafValue,
+            proof,
+            index,
+            rootJSRollup,
+        )).to.be.equal(true);
+
+        await expect(polygonZkEVMBridgeContract.claimMessage(
+            proof,
+            index,
+            mainnetExitRoot,
+            rollupExitRootSC,
+            originNetwork,
+            originAddress,
+            destinationNetwork,
+            destinationAddress,
+            amount,
+            metadata,
+        )).to.emit(polygonZkEVMBridgeContract, 'ClaimEvent')
+            .withArgs(
+                index,
+                originNetwork,
+                originAddress,
+                destinationAddress,
+                amount,
+            )
+            .to.revertedWith('MessageFailed');
+    });
+
+    it('should check caller is bridge address', async () => {
         const nMembers = 4;
         const committeeMembers = [];
         const addrs = await ethers.getSigners();
