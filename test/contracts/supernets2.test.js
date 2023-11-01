@@ -42,7 +42,7 @@ describe('CDKValidium', () => {
     const HALT_AGGREGATION_TIMEOUT = 60 * 60 * 24 * 7; // 7 days
     const _MAX_VERIFY_BATCHES = 1000;
 
-    const l2StakingAddress = '0x1111111111111111111111111111111111111111';
+    const l2StakingAddress = ethers.constants.AddressZero;
 
     beforeEach('Deploy contract', async () => {
         upgrades.silenceWarnings();

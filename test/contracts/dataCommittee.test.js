@@ -33,7 +33,7 @@ describe('Polygon Data Committee', () => {
     const forkID = 0;
     const pendingStateTimeoutDefault = 100;
     const trustedAggregatorTimeoutDefault = 10;
-    const l2StakingAddress = '0x1111111111111111111111111111111111111111';
+    const l2StakingAddress = ethers.constants.AddressZero;
 
     // Committe parameters
     const requiredAmountOfSignatures = 3;

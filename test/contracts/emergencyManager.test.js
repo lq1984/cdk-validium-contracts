@@ -32,7 +32,7 @@ describe('Emergency mode test', () => {
     const pendingStateTimeoutDefault = 10;
     const trustedAggregatorTimeoutDefault = 10;
     let firstDeployment = true;
-    const l2StakingAddress = '0x1111111111111111111111111111111111111111';
+    const l2StakingAddress = ethers.constants.AddressZero;
 
     beforeEach('Deploy contract', async () => {
         upgrades.silenceWarnings();
