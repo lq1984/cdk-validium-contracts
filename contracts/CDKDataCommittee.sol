@@ -102,10 +102,6 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
         return members.length;
     }
 
-    function getMembers() public view returns (Member[] memory){
-        return members;
-    }
-
     /**
      * @notice Verifies that the given signedHash has been signed by requiredAmountOfSignatures committee members
      * @param signedHash Hash that must have been signed by requiredAmountOfSignatures of committee members
@@ -128,7 +124,7 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
 
         // hash the addresses part of the byte array and check that it's equal to committe hash
         if (
-            keccak256(signaturesAndAddrs[splitByte:]) != 
+            keccak256(signaturesAndAddrs[splitByte:]) !=
             committeeHash
         ) {
             revert UnexpectedCommitteeHash();

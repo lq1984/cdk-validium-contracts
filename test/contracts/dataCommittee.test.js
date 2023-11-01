@@ -51,16 +51,6 @@ describe('Polygon Data Committee', () => {
         return { urls, addrsBytes };
     }
 
-    function membersToAddrsBytes(members) {
-        const urls = [];
-        let addrsBytes = '0x';
-        for (let i = 0; i < members.length; i++) {
-            urls.push(members[i].url);
-            addrsBytes += members[i].addr.slice(2);
-        }
-        return ethers.utils.defaultAbiCoder.encode(['uint', 'string[]', 'bytes'], [members.length, urls, addrsBytes]);
-    }
-
     function addreessToDerivationPath(address) {
         const wallets = addrs.slice(0, nMembers);
         for (let i = 0; i < nMembers; i++) {
@@ -209,7 +199,7 @@ describe('Polygon Data Committee', () => {
         // setup committee
         const { urls, addrsBytes } = membersToURLsAndAddrsBytes(committeeMembers);
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [addrsBytes]);
-        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address,l2StakingAddress);
+        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address, l2StakingAddress);
         await expect(cdkDataCommitteeContract.connect(deployer)
             .setupCommittee(requiredAmountOfSignatures, urls, addrsBytes))
             .to.emit(cdkDataCommitteeContract, 'CommitteeUpdated')
@@ -645,39 +635,5 @@ describe('Polygon Data Committee', () => {
         expect(batchData2.accInputHash).to.be.equal(batchAccInputHashJs);
         expect(batchData2.sequencedTimestamp).to.be.equal(sequencedTimestamp);
         expect(batchData2.previousLastBatchSequenced).to.be.equal(0);
-    });
-
-    it('fails bridge members; caller is not bridge', async () => {
-        committeeMembers = [];
-        addrs = await ethers.getSigners();
-        const committeeAddrs = addrs.slice(0, nMembers)
-            .sort((a, b) => a.address - b.address);
-        for (let i = 0; i < nMembers; i++) {
-            committeeMembers.push({
-                url: `foo-${i}`,
-                addr: committeeAddrs[i].address,
-            });
-        }
-        const addrsBytes = membersToAddrsBytes(committeeMembers);
-        await expect(cdkDataCommitteeContract.connect(deployer)
-            .onMessageReceived(PolygonZkEVMBridgeContract.address, 0, addrsBytes))
-            .to.be.revertedWith('caller is not the l1BridgeAddress');
-    });
-
-    it('success bridge members', async () => {
-        committeeMembers = [];
-        addrs = await ethers.getSigners();
-        const committeeAddrs = addrs.slice(0, nMembers)
-            .sort((a, b) => a.address - b.address);
-        for (let i = 0; i < nMembers; i++) {
-            committeeMembers.push({
-                url: `foo-${i}`,
-                addr: committeeAddrs[i].address,
-            });
-        }
-        const addrsBytes = membersToAddrsBytes(committeeMembers);
-        await expect(cdkDataCommitteeContract.connect(deployer)
-            .onMessageReceived(PolygonZkEVMBridgeContract.address, 0, addrsBytes))
-            .to.be.revertedWith('caller is not the l1BridgeAddress');
     });
 });
