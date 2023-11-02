@@ -33,6 +33,7 @@ describe('Polygon Data Committee', () => {
     const forkID = 0;
     const pendingStateTimeoutDefault = 100;
     const trustedAggregatorTimeoutDefault = 10;
+    const l2StakingAddress = ethers.constants.AddressZero;
 
     // Committe parameters
     const requiredAmountOfSignatures = 3;
@@ -198,7 +199,7 @@ describe('Polygon Data Committee', () => {
         // setup committee
         const { urls, addrsBytes } = membersToURLsAndAddrsBytes(committeeMembers);
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [addrsBytes]);
-        await cdkDataCommitteeContract.initialize();
+        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address, l2StakingAddress);
         await expect(cdkDataCommitteeContract.connect(deployer)
             .setupCommittee(requiredAmountOfSignatures, urls, addrsBytes))
             .to.emit(cdkDataCommitteeContract, 'CommitteeUpdated')

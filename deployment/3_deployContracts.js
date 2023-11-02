@@ -56,6 +56,7 @@ async function main() {
         'maticTokenAddress',
         'setupEmptyCommittee',
         'committeeTimelock',
+        'l2StakingAddress',
     ];
 
     for (const parameterName of mandatoryDeploymentParameters) {
@@ -84,6 +85,7 @@ async function main() {
         maticTokenAddress,
         setupEmptyCommittee,
         committeeTimelock,
+        l2StakingAddress,
     } = deployParameters;
 
     // Load provider
@@ -293,7 +295,7 @@ async function main() {
         try {
             cdkDataCommitteeContract = await upgrades.deployProxy(
                 CDKDataCommitteeContractFactory,
-                [],
+                [PolygonZkEVMBridgeContract.address, l2StakingAddress],
             );
             break;
         } catch (error) {
@@ -309,7 +311,6 @@ async function main() {
 
     console.log('#######################\n');
     console.log('cdkDataCommittee deployed to:', cdkDataCommitteeContract.address);
-
     if (setupEmptyCommittee) {
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
         await expect(cdkDataCommitteeContract.connect(deployer)

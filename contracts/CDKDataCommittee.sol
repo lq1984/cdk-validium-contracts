@@ -31,13 +31,22 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
     // Register of the members of the committee
     Member[] public members;
 
+    // L2 Staking Contract address
+    address public l2StakingAddress;
+
+    // L1 Bridge Contract address
+    address public l1BridgeAddress;
+
     /**
      * @dev Emitted when the committee is updated
      * @param committeeHash hash of the addresses of the committee members
      */
     event CommitteeUpdated(bytes32 committeeHash);
 
-    function initialize() external initializer {
+    function initialize(address _l1BridgeAddress, address _l2StakingAddress) external initializer {
+        l1BridgeAddress = _l1BridgeAddress;
+        l2StakingAddress = _l2StakingAddress;
+
         // Initialize OZ contracts
         __Ownable_init_unchained();
     }
@@ -53,40 +62,10 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
      */
     function setupCommittee(
         uint _requiredAmountOfSignatures,
-        string[] calldata urls,
-        bytes calldata addrsBytes
+        string[] memory urls,
+        bytes memory addrsBytes
     ) external onlyOwner {
-        uint membersLength = urls.length;
-        if (membersLength <  _requiredAmountOfSignatures) {
-            revert TooManyRequiredSignatures();
-        }
-        if (addrsBytes.length != membersLength * _ADDR_SIZE) {
-            revert UnexpectedAddrsBytesLength();
-        }
-
-        delete members;
-        address lastAddr;
-        for (uint i = 0; i < membersLength; i++) {
-            uint currentAddresStartingByte = i * _ADDR_SIZE;
-            address currentMemberAddr = address(bytes20(addrsBytes[
-                        currentAddresStartingByte :
-                        currentAddresStartingByte + _ADDR_SIZE
-            ]));
-            if (bytes(urls[i]).length == 0) {
-                revert EmptyURLNotAllowed();
-            }
-            if (lastAddr >= currentMemberAddr) {
-                revert WrongAddrOrder();
-            }
-            lastAddr = currentMemberAddr;
-            members.push(Member({
-                url: urls[i],
-                addr: currentMemberAddr
-            }));
-        }
-        committeeHash = keccak256(addrsBytes);
-        requiredAmountOfSignatures = _requiredAmountOfSignatures;
-        emit CommitteeUpdated(committeeHash);
+        _setupCommittee(_requiredAmountOfSignatures,urls,addrsBytes);
     }
 
     function getAmountOfMembers() public view returns(uint256) {
@@ -115,7 +94,7 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
 
         // hash the addresses part of the byte array and check that it's equal to committe hash
         if (
-            keccak256(signaturesAndAddrs[splitByte:]) != 
+            keccak256(signaturesAndAddrs[splitByte:]) !=
             committeeHash
         ) {
             revert UnexpectedCommitteeHash();
@@ -146,5 +125,58 @@ ICDKDataCommitteeErrors, OwnableUpgradeable {
                 revert CommitteeAddressDoesntExist();
             }
         }
+    }
+
+    function _setupCommittee(
+        uint _requiredAmountOfSignatures,
+        string[] memory urls,
+        bytes memory addrsBytes
+    ) internal {
+        uint membersLength = urls.length;
+        if (membersLength <  _requiredAmountOfSignatures) {
+            revert TooManyRequiredSignatures();
+        }
+        if (addrsBytes.length != membersLength * _ADDR_SIZE) {
+            revert UnexpectedAddrsBytesLength();
+        }
+
+        delete members;
+        address lastAddr;
+        for (uint i = 0; i < membersLength; i++) {
+            uint currentAddresStartingByte = 20 + i * _ADDR_SIZE;
+            address currentMemberAddr;
+            assembly {
+                currentMemberAddr := mload(add(addrsBytes, currentAddresStartingByte))
+            }
+            if (bytes(urls[i]).length == 0) {
+                revert EmptyURLNotAllowed();
+            }
+            if (lastAddr >= currentMemberAddr) {
+                revert WrongAddrOrder();
+            }
+            lastAddr = currentMemberAddr;
+            members.push(Member({
+                url: urls[i],
+                addr: currentMemberAddr
+            }));
+        }
+        committeeHash = keccak256(addrsBytes);
+        requiredAmountOfSignatures = _requiredAmountOfSignatures;
+        emit CommitteeUpdated(committeeHash);
+    }
+
+    function onMessageReceived(
+        address originAddress,
+        uint32 /*originNetwork*/,
+        bytes memory data
+    ) external payable {
+        require(l1BridgeAddress == _msgSender(), "caller is not the l1BridgeAddress");
+        require(originAddress == l2StakingAddress, "originAddress is not the l2StakingAddress");
+        (uint _requiredAmountOfSignatures, string[] memory urls, bytes memory addrsBytes) = _decodeSetupCommitteeData(data);
+        _setupCommittee(_requiredAmountOfSignatures, urls, addrsBytes);
+    }
+
+    function _decodeSetupCommitteeData(bytes memory data) private pure returns (uint, string[] memory, bytes memory) {
+        return abi.decode(data, (uint, string[], bytes));
     }
 }
