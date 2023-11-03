@@ -588,6 +588,7 @@ async function main() {
 
     if (committeeTimelock) {
         await (await cdkDataCommitteeContract.transferOwnership(timelockContract.address)).wait();
+        expect(await cdkDataCommitteeContract.owner()).to.be.equal(timelockContract.address);
     }
 
     console.log('\n#######################');
@@ -595,7 +596,7 @@ async function main() {
     console.log('#######################');
     console.log('minDelayTimelock:', await timelockContract.getMinDelay());
     console.log('cdkValidium:', await timelockContract.cdkValidium());
-    console.log('cdkCommitteen owner: ', await cdkDataCommitteeContract.owner());
+    console.log('cdkCommittee owner: ', await cdkDataCommitteeContract.owner());
 
     const outputJson = {
         cdkValidiumAddress: cdkValidiumContract.address,
