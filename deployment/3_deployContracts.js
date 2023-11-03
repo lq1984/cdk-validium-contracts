@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const { create2Deployment } = require('./helpers/deployment-helpers');
+const { create2Deployment, functionCall } = require('./helpers/deployment-helpers');
 
 const pathOutputJson = path.join(__dirname, './deploy_output.json');
 const pathOngoingDeploymentJson = path.join(__dirname, './deploy_ongoing.json');
@@ -221,9 +221,9 @@ async function main() {
 
     /*
      * Nonce globalExitRoot: currentNonce + 1 (deploy bridge proxy) + 1(impl globalExitRoot
-     * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +4 or +5
+     * + 1 (deploy data comittee proxy) + 1(impl data committee) + 1(transfer ownership)+ setupCommitte? = +5 or +6
      */
-    const nonceDelta = 4 + (setupEmptyCommittee ? 1 : 0);
+    const nonceDelta = 5 + (setupEmptyCommittee ? 1 : 0);
     const nonceProxyGlobalExitRoot = Number((await ethers.provider.getTransactionCount(deployer.address)))
         + nonceDelta;
     // nonceProxyCDKValidium :Nonce globalExitRoot + 1 (proxy globalExitRoot) + 1 (impl cdk) = +2
@@ -289,28 +289,65 @@ async function main() {
     /*
      * Deployment Data Committee
      */
-    let cdkDataCommitteeContract;
     const CDKDataCommitteeContractFactory = await ethers.getContractFactory('CDKDataCommittee', deployer);
-    for (let i = 0; i < attemptsDeployProxy; i++) {
-        try {
-            cdkDataCommitteeContract = await upgrades.deployProxy(
-                CDKDataCommitteeContractFactory,
-                [PolygonZkEVMBridgeContract.address, l2StakingAddress],
-            );
-            break;
-        } catch (error) {
-            console.log(`attempt ${i}`);
-            console.log('upgrades.deployProxy of cdkDataCommitteeContract ', error.message);
-        }
+    const deployTransactionDataCommittee = CDKDataCommitteeContractFactory.getDeployTransaction().data;
+    const [dataCommitteeImplementationAddress, isDataCommitteeDeployed] = await create2Deployment(
+        cdkValidiumDeployerContract,
+        salt,
+        deployTransactionDataCommittee,
+        dataCallNull,
+        deployer,
+        overrideGasLimit,
+    );
 
-        // reach limits of attempts
-        if (i + 1 === attemptsDeployProxy) {
-            throw new Error('cdkDataCommitteeContract contract has not been deployed');
-        }
+    if (isDataCommitteeDeployed) {
+        console.log('#######################\n');
+        console.log('DataCommittee impl deployed to:', dataCommitteeImplementationAddress);
+    } else {
+        console.log('#######################\n');
+        console.log('DataCommittee impl was already deployed to:', dataCommitteeImplementationAddress);
     }
 
-    console.log('#######################\n');
-    console.log('cdkDataCommittee deployed to:', cdkDataCommitteeContract.address);
+    const deployDataCommitteeTransactionProxy = (transparentProxyFactory.getDeployTransaction(
+        dataCommitteeImplementationAddress,
+        proxyAdminAddress,
+        initializeEmptyDataProxy,
+    )).data;
+
+    const dataCallInitDataCommitteeProxy = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
+        'initialize',
+        [
+            PolygonZkEVMBridgeContract.address,
+            l2StakingAddress,
+        ],
+    );
+
+    const [proxyDataCommitteeAddress, isDataCommitteeProxyDeployed] = await create2Deployment(
+        cdkValidiumDeployerContract,
+        salt,
+        deployDataCommitteeTransactionProxy,
+        dataCallInitDataCommitteeProxy,
+        deployer,
+    );
+
+    const cdkDataCommitteeContract = CDKDataCommitteeContractFactory.attach(proxyDataCommitteeAddress);
+    if (isDataCommitteeProxyDeployed) {
+        console.log('#######################\n');
+        console.log('DataCommittee deployed to:', cdkDataCommitteeContract.address);
+    } else {
+        console.log('#######################\n');
+        console.log('DataCommittee was already deployed to:', cdkDataCommitteeContract.address);
+    }
+
+    // transfer ownership from cdkValidiumDeployerContract to deployer
+    const dataCallTransferOwnership = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
+        'transferOwnership',
+        [
+            deployer.address,
+        ],
+    );
+    await functionCall(cdkValidiumDeployerContract, proxyDataCommitteeAddress, dataCallTransferOwnership, deployer, overrideGasLimit);
+
     if (setupEmptyCommittee) {
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
         await expect(cdkDataCommitteeContract.connect(deployer)
@@ -504,6 +541,7 @@ async function main() {
     expect(await upgrades.erc1967.getAdminAddress(precalculateCDKValidiumAddress)).to.be.equal(proxyAdminAddress);
     expect(await upgrades.erc1967.getAdminAddress(precalculateGLobalExitRootAddress)).to.be.equal(proxyAdminAddress);
     expect(await upgrades.erc1967.getAdminAddress(proxyBridgeAddress)).to.be.equal(proxyAdminAddress);
+    expect(await upgrades.erc1967.getAdminAddress(cdkDataCommitteeContract.address)).to.be.equal(proxyAdminAddress);
 
     const proxyAdminInstance = proxyAdminFactory.attach(proxyAdminAddress);
     const proxyAdminOwner = await proxyAdminInstance.owner();
@@ -557,6 +595,7 @@ async function main() {
     console.log('#######################');
     console.log('minDelayTimelock:', await timelockContract.getMinDelay());
     console.log('cdkValidium:', await timelockContract.cdkValidium());
+    console.log('cdkCommitteen owner: ', await cdkDataCommitteeContract.owner());
 
     const outputJson = {
         cdkValidiumAddress: cdkValidiumContract.address,

@@ -99,7 +99,25 @@ async function create2Deployment(cdkValidiumDeployerContract, salt, deployTransa
     return [precalculatedAddressDeployed, true];
 }
 
+async function functionCall(cdkValidiumDeployerContract, targetAddress, dataCall, deployer, hardcodedGasLimit) {
+    const amount = 0;
+
+    // Deploy using create2 and call
+    if (hardcodedGasLimit) {
+        const populatedTransaction = await cdkValidiumDeployerContract.populateTransaction.functionCall(
+            targetAddress,
+            dataCall,
+            amount,
+        );
+        populatedTransaction.gasLimit = ethers.BigNumber.from(hardcodedGasLimit);
+        await (await deployer.sendTransaction(populatedTransaction)).wait();
+    } else {
+        await (await cdkValidiumDeployerContract.functionCall(targetAddress, dataCall, amount)).wait();
+    }
+}
+
 module.exports = {
     deployCDKValidiumDeployer,
     create2Deployment,
+    functionCall,
 };
