@@ -337,6 +337,7 @@ async function main() {
     } else {
         console.log('#######################\n');
         console.log('DataCommittee was already deployed to:', cdkDataCommitteeContract.address);
+        await upgrades.forceImport(proxyDataCommitteeAddress, CDKDataCommitteeContractFactory, 'transparent');
     }
 
     // transfer ownership from cdkValidiumDeployerContract to deployer
