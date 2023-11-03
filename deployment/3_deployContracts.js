@@ -221,9 +221,9 @@ async function main() {
 
     /*
      * Nonce globalExitRoot: currentNonce + 1 (deploy bridge proxy) + 1(impl globalExitRoot
-     * + 1 (deploy data comittee proxy) + 1(impl data committee) + 1(transfer ownership)+ setupCommitte? = +5 or +6
+     * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +5 or +6
      */
-    const nonceDelta = 5 + (setupEmptyCommittee ? 1 : 0);
+    const nonceDelta = 4 + (setupEmptyCommittee ? 1 : 0);
     const nonceProxyGlobalExitRoot = Number((await ethers.provider.getTransactionCount(deployer.address)))
         + nonceDelta;
     // nonceProxyCDKValidium :Nonce globalExitRoot + 1 (proxy globalExitRoot) + 1 (impl cdk) = +2
@@ -340,21 +340,17 @@ async function main() {
         await upgrades.forceImport(proxyDataCommitteeAddress, CDKDataCommitteeContractFactory, 'transparent');
     }
 
-    // transfer ownership from cdkValidiumDeployerContract to deployer
-    const dataCallTransferOwnership = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
-        'transferOwnership',
-        [
-            deployer.address,
-        ],
-    );
-    await functionCall(cdkValidiumDeployerContract, proxyDataCommitteeAddress, dataCallTransferOwnership, deployer, overrideGasLimit);
-
     if (setupEmptyCommittee) {
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
-        await expect(cdkDataCommitteeContract.connect(deployer)
-            .setupCommittee(0, [], []))
-            .to.emit(cdkDataCommitteeContract, 'CommitteeUpdated')
-            .withArgs(expectedHash);
+        const dataCallSetupCommittee = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
+            'setupCommittee',
+            [0, [], []],
+        );
+        await functionCall(cdkValidiumDeployerContract, proxyDataCommitteeAddress, dataCallSetupCommittee, deployer, overrideGasLimit);
+        const events = await cdkDataCommitteeContract.queryFilter('CommitteeUpdated');
+        expect(events.length).to.equal(1);
+        const event = events[0];
+        expect(event.args.committeeHash).to.equal(expectedHash);
         console.log('Empty committee seted up');
     }
 
@@ -588,7 +584,13 @@ async function main() {
     }
 
     if (committeeTimelock) {
-        await (await cdkDataCommitteeContract.transferOwnership(timelockContract.address)).wait();
+        const dataCallTransferOwnership = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
+            'transferOwnership',
+            [
+                timelockContract.address,
+            ],
+        );
+        await functionCall(cdkValidiumDeployerContract, proxyDataCommitteeAddress, dataCallTransferOwnership, deployer, overrideGasLimit);
         expect(await cdkDataCommitteeContract.owner()).to.be.equal(timelockContract.address);
     }
 
