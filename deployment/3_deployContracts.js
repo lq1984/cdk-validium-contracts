@@ -221,7 +221,7 @@ async function main() {
 
     /*
      * Nonce globalExitRoot: currentNonce + 1 (deploy bridge proxy) + 1(impl globalExitRoot
-     * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +5 or +6
+     * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +4 or +5
      */
     const nonceDelta = 4 + (setupEmptyCommittee ? 1 : 0);
     const nonceProxyGlobalExitRoot = Number((await ethers.provider.getTransactionCount(deployer.address)))
