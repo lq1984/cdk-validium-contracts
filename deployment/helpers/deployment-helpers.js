@@ -102,7 +102,6 @@ async function create2Deployment(cdkValidiumDeployerContract, salt, deployTransa
 async function functionCall(cdkValidiumDeployerContract, targetAddress, dataCall, deployer, hardcodedGasLimit) {
     const amount = 0;
 
-    // Deploy using create2 and call
     if (hardcodedGasLimit) {
         const populatedTransaction = await cdkValidiumDeployerContract.populateTransaction.functionCall(
             targetAddress,
