@@ -54,7 +54,8 @@ async function main() {
         'salt',
         'cdkValidiumDeployerAddress',
         'maticTokenAddress',
-        'setupEmptyCommittee',
+        'setupDefaultCommittee',
+        'defaultCommittee',
         'committeeTimelock',
         'l2StakingAddress',
     ];
@@ -83,7 +84,8 @@ async function main() {
         salt,
         cdkValidiumDeployerAddress,
         maticTokenAddress,
-        setupEmptyCommittee,
+        setupDefaultCommittee,
+        defaultCommittee,
         committeeTimelock,
         l2StakingAddress,
     } = deployParameters;
@@ -223,7 +225,7 @@ async function main() {
      * Nonce globalExitRoot: currentNonce + 1 (deploy bridge proxy) + 1(impl globalExitRoot
      * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +4 or +5
      */
-    const nonceDelta = 4 + (setupEmptyCommittee ? 1 : 0);
+    const nonceDelta = 4 + (setupDefaultCommittee ? 1 : 0);
     const nonceProxyGlobalExitRoot = Number((await ethers.provider.getTransactionCount(deployer.address)))
         + nonceDelta;
     // nonceProxyCDKValidium :Nonce globalExitRoot + 1 (proxy globalExitRoot) + 1 (impl cdk) = +2
@@ -311,13 +313,21 @@ async function main() {
 
     console.log('#######################\n');
     console.log('cdkDataCommittee deployed to:', cdkDataCommitteeContract.address);
-    if (setupEmptyCommittee) {
-        const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
+    if (setupDefaultCommittee && defaultCommittee.length > 0) {
+        defaultCommittee.sort((a, b) => a.address - b.address);
+        const urls = [];
+        let addrsBytes = '0x';
+        for (let i = 0; i < defaultCommittee.length; i++) {
+            urls.push(defaultCommittee[i].url);
+            addrsBytes += defaultCommittee[i].address.slice(2);
+        }
+        const requiredAmountOfSignatures = Math.floor(defaultCommittee.length / 2) + 1;
+        const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [addrsBytes]);
         await expect(cdkDataCommitteeContract.connect(deployer)
-            .setupCommittee(0, [], []))
+            .setupCommittee(requiredAmountOfSignatures, urls, addrsBytes))
             .to.emit(cdkDataCommitteeContract, 'CommitteeUpdated')
             .withArgs(expectedHash);
-        console.log('Empty committee seted up');
+        console.log('Default committee seted up');
     }
 
     /*
