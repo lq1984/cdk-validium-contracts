@@ -54,6 +54,7 @@ async function main() {
         'salt',
         'cdkValidiumDeployerAddress',
         'maticTokenAddress',
+        'requiredAmountOfSignatures',
         'defaultCommittee',
         'committeeTimelock',
         'l2StakingAddress',
@@ -83,6 +84,7 @@ async function main() {
         salt,
         cdkValidiumDeployerAddress,
         maticTokenAddress,
+        requiredAmountOfSignatures,
         defaultCommittee,
         committeeTimelock,
         l2StakingAddress,
@@ -341,6 +343,9 @@ async function main() {
     }
 
     if (defaultCommittee.length > 0) {
+        if (requiredAmountOfSignatures <= 0 || requiredAmountOfSignatures > defaultCommittee.length) {
+            throw new Error(`param: requiredAmountOfSignatures must be less than defaultCommittee.length: ${defaultCommittee.length}`);
+        }
         defaultCommittee.sort((a, b) => a.address - b.address);
         const urls = [];
         let addresses = '0x';
@@ -348,7 +353,6 @@ async function main() {
             urls.push(defaultCommittee[i].url);
             addresses += defaultCommittee[i].address.slice(2);
         }
-        const requiredAmountOfSignatures = Math.floor(defaultCommittee.length / 2) + 1;
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [addresses]);
         const dataCallSetupCommittee = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
             'setupCommittee',
