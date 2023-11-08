@@ -133,7 +133,7 @@ describe('Emergency mode test', () => {
         await maticTokenContract.transfer(trustedSequencer.address, ethers.utils.parseEther('1000'));
 
         // init data committee
-        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address,l2StakingAddress);
+        await cdkDataCommitteeContract.initialize(PolygonZkEVMBridgeContract.address, l2StakingAddress);
         const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
         await expect(cdkDataCommitteeContract.connect(deployer)
             .setupCommittee(0, [], []))

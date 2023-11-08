@@ -11,7 +11,7 @@ import "./GovernanceToken.sol";
 ///         token supply. Upgradable to allow changes in the inflation schedule.
 contract MintManager is Ownable {
     /// @notice The GovernanceToken that the MintManager can mint tokens
-    GovernanceToken public immutable governanceToken;
+    GovernanceToken public governanceToken;
 
     /// @notice The amount of tokens that can be minted per year.
     ///         The value is a fixed point number with 4 decimals.

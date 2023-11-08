@@ -5,12 +5,17 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract GovernanceToken is ERC20Burnable, ERC20Votes, Ownable {
+contract GovernanceToken is Initializable, ERC20Burnable, ERC20Votes, Ownable {
     constructor()
     ERC20("Function X", "FX")
     ERC20Permit("Function X")
     {}
+
+    function initialize(address initialOwner) initializer public {
+        _transferOwnership(initialOwner);
+    }
 
     /// @notice Allows the owner to mint tokens.
     /// @param _account The account receiving minted tokens.

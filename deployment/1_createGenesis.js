@@ -14,7 +14,7 @@ const {
     MemDB, ZkEVMDB, getPoseidon, smtUtils,
 } = require('@0xpolygonhermez/zkevm-commonjs');
 
-const { deployCDKValidiumDeployer, create2Deployment } = require('./helpers/deployment-helpers');
+const { deployCDKValidiumDeployer, create2Deployment, functionCall } = require('./helpers/deployment-helpers');
 
 const deployParametersPath = argv.input ? argv.input : './deploy_parameters.json';
 const deployParameters = require(deployParametersPath);
@@ -163,6 +163,84 @@ async function main() {
     const proxyAdminInstance = proxyAdminFactory.attach(proxyAdminAddress);
     await (await proxyAdminInstance.connect(deployer).transferOwnership(timelockContract.address)).wait();
 
+    /**
+     * 1. deploy governance token logic
+     * 2. deploy governance proxy and initialize with the deployer as owner
+     * 3. deploy mint manager and initialize with timelock address and the governance proxy address
+     * 4. transfer ownership of the governance proxy to the mint manager
+     * 5. transfer admin of the governance proxy to the proxy admin
+     */
+
+    /**
+     * Deployment GovernanceToken token
+     *
+     */
+    const governanceTokenFactory = await ethers.getContractFactory('GovernanceToken', deployer);
+    const deployTransactionGovernanceToken = governanceTokenFactory.getDeployTransaction().data;
+    const [governanceTokenImplementationAddress] = await create2Deployment(
+        cdkValidiumDeployerContract,
+        salt,
+        deployTransactionGovernanceToken,
+        null,
+        deployer,
+    );
+
+    /*
+     * Deployment GovernanceToken token proxy
+     */
+    const dataCallGovernanceTokenProxyInit = governanceTokenFactory.interface.encodeFunctionData(
+        'initialize',
+        [
+            cdkValidiumDeployerContract.address,
+        ],
+    );
+    const deployTransactionGovTokenProxy = (transparentProxyFactory.getDeployTransaction(
+        governanceTokenImplementationAddress,
+        deployer.address,
+        dataCallGovernanceTokenProxyInit,
+    )).data;
+
+    const [governanceTokenProxyAddress] = await create2Deployment(
+        cdkValidiumDeployerContract,
+        salt,
+        deployTransactionGovTokenProxy,
+        null,
+        deployer,
+    );
+
+    /**
+     * Deployment MintManger
+     *
+     */
+    const mintManagerFactory = await ethers.getContractFactory('MintManager', deployer);
+    const deployTransactionMintManagerFactory = mintManagerFactory.getDeployTransaction(
+        timelockContract.address,
+        governanceTokenProxyAddress,
+    ).data;
+
+    const [mintManagerAddress] = await create2Deployment(
+        cdkValidiumDeployerContract,
+        salt,
+        deployTransactionMintManagerFactory,
+        null,
+        deployer,
+    );
+    expect(await mintManagerFactory.attach(mintManagerAddress).owner()).to.be.equal(timelockContract.address);
+    expect(await mintManagerFactory.attach(mintManagerAddress).governanceToken()).to.be.equal(governanceTokenProxyAddress);
+
+    // transfer ownership of the governance token to the mint manager
+    const dataCallGovernanceTokenProxy = governanceTokenFactory.interface.encodeFunctionData(
+        'transferOwnership',
+        [
+            mintManagerAddress,
+        ],
+    );
+    await functionCall(cdkValidiumDeployerContract, governanceTokenProxyAddress, dataCallGovernanceTokenProxy, deployer);
+
+    // transfer admin of the governance token proxy to the proxy admin
+    await transparentProxyFactory.attach(governanceTokenProxyAddress).connect(deployer).changeAdmin(proxyAdminAddress);
+    expect(await upgrades.erc1967.getAdminAddress(governanceTokenProxyAddress)).to.be.equal(proxyAdminAddress);
+
     // Recreate genesis with the current information:
     const genesis = [];
 
@@ -278,6 +356,42 @@ async function main() {
         address: timelockContract.address,
         bytecode: timelockInfo.bytecode,
         storage: timelockInfo.storage,
+    });
+
+    // Governance token implementation
+    const governanceTokenImplInfo = await getAddressInfo(governanceTokenImplementationAddress);
+
+    genesis.push({
+        contractName: 'Governance Token Implementation',
+        balance: '0',
+        nonce: governanceTokenImplInfo.nonce.toString(),
+        address: governanceTokenImplementationAddress,
+        bytecode: governanceTokenImplInfo.bytecode,
+        storage: governanceTokenImplInfo.storage,
+    });
+
+    // Governance token proxy
+    const governanceTokenProxyInfo = await getAddressInfo(governanceTokenProxyAddress);
+
+    genesis.push({
+        contractName: 'Governance Token Proxy',
+        balance: '0',
+        nonce: governanceTokenProxyInfo.nonce.toString(),
+        address: governanceTokenProxyAddress,
+        bytecode: governanceTokenProxyInfo.bytecode,
+        storage: governanceTokenProxyInfo.storage,
+    });
+
+    // Mint Manager
+    const mintManagerInfo = await getAddressInfo(mintManagerAddress);
+
+    genesis.push({
+        contractName: 'MintManager',
+        balance: '0',
+        nonce: mintManagerInfo.nonce.toString(),
+        address: mintManagerAddress,
+        bytecode: mintManagerInfo.bytecode,
+        storage: mintManagerInfo.storage,
     });
 
     // Put nonces on deployers
