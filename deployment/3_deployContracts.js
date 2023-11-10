@@ -54,7 +54,8 @@ async function main() {
         'salt',
         'cdkValidiumDeployerAddress',
         'maticTokenAddress',
-        'setupEmptyCommittee',
+        'requiredAmountOfSignatures',
+        'defaultCommittee',
         'committeeTimelock',
         'l2StakingAddress',
     ];
@@ -83,7 +84,8 @@ async function main() {
         salt,
         cdkValidiumDeployerAddress,
         maticTokenAddress,
-        setupEmptyCommittee,
+        requiredAmountOfSignatures,
+        defaultCommittee,
         committeeTimelock,
         l2StakingAddress,
     } = deployParameters;
@@ -223,7 +225,7 @@ async function main() {
      * Nonce globalExitRoot: currentNonce + 1 (deploy bridge proxy) + 1(impl globalExitRoot
      * + 1 (deploy data comittee proxy) + 1(impl data committee) + setupCommitte? = +4 or +5
      */
-    const nonceDelta = 4 + (setupEmptyCommittee ? 1 : 0);
+    const nonceDelta = 4 + (defaultCommittee.length > 0 ? 1 : 0);
     const nonceProxyGlobalExitRoot = Number((await ethers.provider.getTransactionCount(deployer.address)))
         + nonceDelta;
     // nonceProxyCDKValidium :Nonce globalExitRoot + 1 (proxy globalExitRoot) + 1 (impl cdk) = +2
@@ -340,11 +342,21 @@ async function main() {
         await upgrades.forceImport(proxyDataCommitteeAddress, CDKDataCommitteeContractFactory, 'transparent');
     }
 
-    if (setupEmptyCommittee) {
-        const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [[]]);
+    if (defaultCommittee.length > 0) {
+        if (requiredAmountOfSignatures <= 0 || requiredAmountOfSignatures > defaultCommittee.length) {
+            throw new Error(`param: requiredAmountOfSignatures must be less than defaultCommittee.length: ${defaultCommittee.length}`);
+        }
+        defaultCommittee.sort((a, b) => a.address - b.address);
+        const urls = [];
+        let addresses = '0x';
+        for (let i = 0; i < defaultCommittee.length; i++) {
+            urls.push(defaultCommittee[i].url);
+            addresses += defaultCommittee[i].address.slice(2);
+        }
+        const expectedHash = ethers.utils.solidityKeccak256(['bytes'], [addresses]);
         const dataCallSetupCommittee = CDKDataCommitteeContractFactory.interface.encodeFunctionData(
             'setupCommittee',
-            [0, [], []],
+            [requiredAmountOfSignatures, urls, addresses],
         );
         await functionCall(cdkValidiumDeployerContract, proxyDataCommitteeAddress, dataCallSetupCommittee, deployer, overrideGasLimit);
         const events = await cdkDataCommitteeContract.queryFilter('CommitteeUpdated');

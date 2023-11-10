@@ -17,7 +17,13 @@
     "cdkValidiumDeployerAddress":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
     "initialCDKValidiumDeployerOwner" :"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     "maticTokenAddress":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-    "setupEmptyCommittee": true,
     "committeeTimelock": false,
-    "l2StakingAddress": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+    "l2StakingAddress": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    "requiredAmountOfSignatures": 1,
+    "defaultCommittee": [
+        {
+            "address": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+            "url": "http://cdk-validium-data-availability:8444"
+        }
+    ]
 }
