@@ -613,6 +613,7 @@ async function main() {
     console.log('cdkValidium:', await timelockContract.cdkValidium());
     console.log('cdkCommittee owner: ', await cdkDataCommitteeContract.owner());
 
+    const l1ChainId = (await ethers.provider.getNetwork()).chainId;
     const outputJson = {
         cdkValidiumAddress: cdkValidiumContract.address,
         polygonZkEVMBridgeAddress: PolygonZkEVMBridgeContract.address,
@@ -635,6 +636,7 @@ async function main() {
         forkID,
         salt,
         version,
+        l1ChainId
     };
     fs.writeFileSync(pathOutputJson, JSON.stringify(outputJson, null, 1));
 
